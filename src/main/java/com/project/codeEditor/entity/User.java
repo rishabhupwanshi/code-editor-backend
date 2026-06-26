@@ -22,6 +22,9 @@ public class User {
 
     private String password;
 
+    @Column(unique = true)
+    private String token;
+
     public User() {}
 
     public Long getId() {
@@ -54,5 +57,13 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 }
