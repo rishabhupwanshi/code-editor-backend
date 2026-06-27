@@ -8,10 +8,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.project.codeEditor.dto.AuthResponse;
+import com.project.codeEditor.dto.GoogleLoginRequest;
 import com.project.codeEditor.dto.LoginRequest;
 import com.project.codeEditor.dto.RegisterRequest;
 import com.project.codeEditor.entity.User;
 import com.project.codeEditor.repository.UserRepository;
+import com.project.codeEditor.security.GoogleTokenVerifier;
 
 @Service
 public class AuthService {
@@ -21,6 +23,9 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private GoogleTokenVerifier googleTokenVerifier;
 
     public AuthResponse register(RegisterRequest request) {
 
@@ -59,5 +64,39 @@ public class AuthService {
         }
 
         return new AuthResponse("Invalid Password", null, request.getEmail(), null);
+   
     }
+
+    public AuthResponse googleLogin(GoogleLoginRequest request) {
+        try {
+            var payload = googleTokenVerifier.verify(request.getCredential());
+
+            if (payload == null) {
+                return new AuthResponse("Invalid Google credential", null, null, null);
+            }
+
+            String email = payload.getEmail();
+            String name = payload.get("name") != null ? payload.get("name").toString() : payload.getEmail();
+
+            User user = userRepository.findByEmail(email)
+                    .orElseGet(() -> {
+                        User newUser = new User();
+                        newUser.setEmail(email);
+                        newUser.setName(name);
+                        newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                        newUser.setToken(UUID.randomUUID().toString());
+                        return userRepository.save(newUser);
+                    });
+
+            if (user.getToken() == null || user.getToken().isBlank()) {
+                user.setToken(UUID.randomUUID().toString());
+                userRepository.save(user);
+            }
+
+            return new AuthResponse("Login Successful", user.getToken(), user.getEmail(), user.getName());
+        } catch (Exception ex) {
+            return new AuthResponse("Google login failed: " + ex.getMessage(), null, null, null);
+        }
+    }
+
 }
